@@ -1,4 +1,4 @@
-use serde::{ser, Serialize};
+use serde::{ser, Serialize, serde_if_integer128};
 use std::io::Write;
 
 use crate::error::{Error, Result};
@@ -82,6 +82,16 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         Ok(())
     }
 
+    serde_if_integer128! {
+
+        fn serialize_i128(self, v: i128) -> std::result::Result<Self::Ok,Self::Error> {
+            self.writer.write_all(&v.to_be_bytes())?;
+            Ok(())
+        }
+
+    }
+
+
     fn serialize_u8(self, v: u8) -> Result<Self::Ok> {
         self.writer.write_all(&v.to_be_bytes())?;
         Ok(())
@@ -110,6 +120,15 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_f64(self, v: f64) -> Result<Self::Ok> {
         self.writer.write_all(&v.to_be_bytes())?;
         Ok(())
+    }
+
+    serde_if_integer128! {
+
+        fn serialize_u128(self, v: u128) -> std::result::Result<Self::Ok,Self::Error> {
+            self.writer.write_all(&v.to_be_bytes())?;
+            Ok(())
+        }
+
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok> {

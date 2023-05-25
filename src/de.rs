@@ -1,6 +1,6 @@
 use serde::{
     de::{self, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
-    Deserialize,
+    Deserialize, serde_if_integer128,
 };
 
 use crate::error::{Error, Result};
@@ -112,6 +112,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_i64(i64::from_be_bytes(bytes))
     }
 
+    serde_if_integer128! {
+        
+        fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
+        where
+            V: Visitor<'de>
+        {
+            let bytes = self.pop_n()?;
+            visitor.visit_i128(i128::from_be_bytes(bytes))
+        }
+
+    }
+
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
@@ -142,6 +154,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         let bytes = self.pop_n()?;
         visitor.visit_u64(u64::from_be_bytes(bytes))
+    }
+
+    serde_if_integer128! {
+        
+        fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
+        where
+            V: Visitor<'de>
+        {
+            let bytes = self.pop_n()?;
+            visitor.visit_u128(u128::from_be_bytes(bytes))
+        }
+
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
