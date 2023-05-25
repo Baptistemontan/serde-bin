@@ -313,7 +313,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        visitor.visit_enum(EnumDeserializer { de: self })
+        visitor.visit_enum(self)
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
@@ -390,11 +390,7 @@ impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
     }
 }
 
-struct EnumDeserializer<'a, 'de: 'a> {
-    de: &'a mut Deserializer<'de>,
-}
-
-impl<'a, 'de> EnumAccess<'de> for EnumDeserializer<'a, 'de> {
+impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -402,12 +398,12 @@ impl<'a, 'de> EnumAccess<'de> for EnumDeserializer<'a, 'de> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        let val = seed.deserialize(&mut *self.de)?;
+        let val = seed.deserialize(&mut *self)?;
         Ok((val, self))
     }
 }
 
-impl<'a, 'de> VariantAccess<'de> for EnumDeserializer<'a, 'de> {
+impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
@@ -418,20 +414,20 @@ impl<'a, 'de> VariantAccess<'de> for EnumDeserializer<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self.de)
+        seed.deserialize(self)
     }
 
     fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_seq(SeqDeserializer::new_with_len(self.de, len))
+        visitor.visit_seq(SeqDeserializer::new_with_len(self, len))
     }
 
     fn struct_variant<V>(self, fields: &'static [&'static str], visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_seq(SeqDeserializer::new_with_len(self.de, fields.len()))
+        visitor.visit_seq(SeqDeserializer::new_with_len(self, fields.len()))
     }
 }
