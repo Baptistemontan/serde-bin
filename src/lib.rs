@@ -30,7 +30,6 @@ mod tests {
         const N: usize = 56;
         const STRING: &str = "Hello";
 
-
         let value = TestStruct {
             a: N,
             b: STRING.to_string(),
@@ -43,10 +42,13 @@ mod tests {
         let len = u64::to_be_bytes(STRING.len() as u64);
         let str_bytes = STRING.as_bytes();
 
-        let check: Vec<u8> = n_bytes.into_iter().chain(len).chain(str_bytes.iter().copied()).collect();
+        let check: Vec<u8> = n_bytes
+            .into_iter()
+            .chain(len)
+            .chain(str_bytes.iter().copied())
+            .collect();
 
         assert_eq!(v, check);
-
     }
 
     #[test]

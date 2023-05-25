@@ -1,4 +1,4 @@
-use serde::{ser, Serialize, serde_if_integer128};
+use serde::{ser, serde_if_integer128, Serialize};
 use std::io::Write;
 
 use crate::error::{Error, Result};
@@ -90,7 +90,6 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         }
 
     }
-
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok> {
         self.writer.write_all(&v.to_be_bytes())?;

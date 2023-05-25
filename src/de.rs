@@ -1,6 +1,6 @@
 use serde::{
     de::{self, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
-    Deserialize, serde_if_integer128,
+    serde_if_integer128, Deserialize,
 };
 
 use crate::error::{Error, Result};
@@ -113,7 +113,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde_if_integer128! {
-        
+
         fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
         where
             V: Visitor<'de>
@@ -157,7 +157,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     serde_if_integer128! {
-        
+
         fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
         where
             V: Visitor<'de>
