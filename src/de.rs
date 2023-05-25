@@ -20,7 +20,6 @@ where
 }
 
 impl<'de> Deserializer<'de> {
-
     fn pop_slice(&mut self, len: usize) -> Result<&'de [u8]> {
         if self.input.len() < len {
             return Err(Error::Eof);
