@@ -21,7 +21,7 @@ where
 
 impl<'de> Deserializer<'de> {
     fn pop_n<const N: usize>(&mut self) -> Result<[u8; N]> {
-        let bytes = self.input.get(..N).ok_or(Error::EOF)?;
+        let bytes = self.input.get(..N).ok_or(Error::Eof)?;
         let mut buff = [0; N];
 
         buff.copy_from_slice(bytes);
@@ -40,7 +40,7 @@ impl<'de> Deserializer<'de> {
 
     fn pop_slice(&mut self) -> Result<&'de [u8]> {
         let len = self.pop_usize()?;
-        let bytes = self.input.get(..len).ok_or(Error::EOF)?;
+        let bytes = self.input.get(..len).ok_or(Error::Eof)?;
         self.input = &self.input[len..];
         Ok(bytes)
     }

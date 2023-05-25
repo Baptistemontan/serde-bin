@@ -7,7 +7,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     IOError(io::Error),
     Message(String),
-    EOF,
+    Eof,
     InvalidBool(u8),
     InvalidChar(u32),
     InvalidStr(Utf8Error),
@@ -22,7 +22,7 @@ impl Display for Error {
         match self {
             Error::IOError(io_err) => io_err.fmt(f),
             Error::Message(msg) => f.write_str(msg),
-            Error::EOF => f.write_str("Reached EOF before end of deserialization"),
+            Error::Eof => f.write_str("Reached EOF before end of deserialization"),
             Error::InvalidBool(byte) => f.write_fmt(format_args!(
                 "Error deserializing bool: Expecting 0 or 1, found {}",
                 byte
