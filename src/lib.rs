@@ -27,15 +27,26 @@ mod tests {
 
     #[test]
     fn test_serialize_struct() {
+        const N: usize = 56;
+        const STRING: &str = "Hello";
+
+
         let value = TestStruct {
-            a: 56,
-            b: "Hello".to_string(),
+            a: N,
+            b: STRING.to_string(),
         };
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
 
-        println!("{:?}", v);
+        let n_bytes = u64::to_be_bytes(N as u64);
+        let len = u64::to_be_bytes(STRING.len() as u64);
+        let str_bytes = STRING.as_bytes();
+
+        let check: Vec<u8> = n_bytes.into_iter().chain(len).chain(str_bytes.iter().copied()).collect();
+
+        assert_eq!(v, check);
+
     }
 
     #[test]
@@ -48,11 +59,9 @@ mod tests {
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
 
-        println!("{:?}", v);
-
         let t: TestStruct = de::from_bytes(&v).unwrap();
 
-        println!("{:?}", t);
+        assert_eq!(t, value);
     }
 
     #[test]
@@ -61,8 +70,6 @@ mod tests {
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
-
-        println!("{:?}", v);
 
         assert_eq!(v, &[0, 0, 0, 0])
     }
@@ -73,8 +80,6 @@ mod tests {
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
-
-        println!("{:?}", v);
 
         assert_eq!(v, &[0, 0, 0, 1, 56])
     }
@@ -87,8 +92,6 @@ mod tests {
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
-
-        println!("{:?}", v);
 
         let variant_index_bytes = 2u32.to_be_bytes();
         let fbytes = NUM.to_be_bytes();
@@ -116,8 +119,6 @@ mod tests {
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
 
-        println!("{:?}", v);
-
         let variant_index_bytes = 3u32.to_be_bytes();
         let fbytes = NUM.to_be_bytes();
         let len_bytes = (VEC.len() as u64).to_be_bytes();
@@ -139,8 +140,6 @@ mod tests {
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
 
-        println!("{:?}", v);
-
         let res: TestEnum = de::from_bytes(&v).unwrap();
 
         assert_eq!(value, res);
@@ -152,8 +151,6 @@ mod tests {
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
-
-        println!("{:?}", v);
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
 
@@ -168,8 +165,6 @@ mod tests {
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
-
-        println!("{:?}", v);
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
 
@@ -187,8 +182,6 @@ mod tests {
 
         let mut v: Vec<u8> = vec![];
         ser::to_writer(&value, &mut v).unwrap();
-
-        println!("{:?}", v);
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
 
