@@ -20,14 +20,20 @@ where
 }
 
 impl<'de> Deserializer<'de> {
+
+    fn pop_slice(&mut self, len: usize) -> Result<&'de [u8]> {
+        if self.input.len() < len {
+            return Err(Error::Eof);
+        }
+        let (bytes, rem) = self.input.split_at(len);
+        self.input = rem;
+        Ok(bytes)
+    }
+
     fn pop_n<const N: usize>(&mut self) -> Result<[u8; N]> {
-        let bytes = self.input.get(..N).ok_or(Error::Eof)?;
+        let bytes = self.pop_slice(N)?;
         let mut buff = [0; N];
-
         buff.copy_from_slice(bytes);
-
-        self.input = &self.input[N..];
-
         Ok(buff)
     }
 
@@ -38,15 +44,12 @@ impl<'de> Deserializer<'de> {
             .map_err(|_| Error::InvalidSize)
     }
 
-    fn pop_slice(&mut self) -> Result<&'de [u8]> {
-        let len = self.pop_usize()?;
-        let bytes = self.input.get(..len).ok_or(Error::Eof)?;
-        self.input = &self.input[len..];
-        Ok(bytes)
+    fn pop_bytes_seq(&mut self) -> Result<&'de [u8]> {
+        self.pop_usize().and_then(|len| self.pop_slice(len))
     }
 
     fn parse_str(&mut self) -> Result<&'de str> {
-        let bytes = self.pop_slice()?;
+        let bytes = self.pop_bytes_seq()?;
         let s = std::str::from_utf8(bytes)?;
         Ok(s)
     }
@@ -213,7 +216,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let bytes = self.pop_slice()?;
+        let bytes = self.pop_bytes_seq()?;
         visitor.visit_bytes(bytes)
     }
 
