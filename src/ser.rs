@@ -4,11 +4,10 @@ use serde::{ser, serde_if_integer128, Serialize};
 use std::io;
 
 use crate::error::{Error, Result};
-use crate::write::Write;
+use crate::write::{BuffWriter, EndOfBuff, Write};
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 use crate::error::NoWriterError;
-
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -43,30 +42,32 @@ where
 }
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
-pub fn to_bytes<W, T>(value: &T) -> Result<Vec<u8>, NoWriterError>
+pub fn to_bytes<T>(value: &T) -> Result<Vec<u8>, NoWriterError>
 where
     T: Serialize,
-    W: Write,
 {
-
     let mut output = Vec::new();
     Serializer::to_writer(value, &mut output)?;
     Ok(output)
 }
 
 #[cfg(feature = "std")]
-pub fn to_bytes<W, T>(value: &T) -> Result<Vec<u8>, io::Error>
+pub fn to_bytes<T>(value: &T) -> Result<Vec<u8>, io::Error>
 where
     T: Serialize,
-    W: Write,
 {
-
     let mut output = Vec::new();
     Serializer::to_writer(value, &mut output)?;
     Ok(output)
 }
 
-
+pub fn to_buff<T>(value: &T, buff: &mut [u8]) -> Result<usize, EndOfBuff>
+where
+    T: Serialize,
+{
+    let buff_writer = BuffWriter::new(buff);
+    Serializer::to_writer(value, buff_writer)
+}
 
 impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     type Ok = usize;
@@ -87,23 +88,34 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, W::Error> {
         let byte: u8 = v.into();
-        self.writer.write_byte(byte).map(|_| 1).map_err(Error::WriterError)
+        self.writer
+            .write_byte(byte)
+            .map(|_| 1)
+            .map_err(Error::WriterError)
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     serde_if_integer128! {
@@ -115,27 +127,39 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, W::Error> {
-        self.writer.write_bytes(&v.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&v.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     serde_if_integer128! {
@@ -148,7 +172,9 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, W::Error> {
         let bytes: u32 = v.into();
-        self.writer.write_bytes(&bytes.to_be_bytes()).map_err(Error::WriterError)
+        self.writer
+            .write_bytes(&bytes.to_be_bytes())
+            .map_err(Error::WriterError)
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok, W::Error> {
@@ -157,8 +183,14 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, W::Error> {
         let len = v.len() as u64;
-        let writted_bytes = self.writer.write_bytes(&len.to_be_bytes()).map_err(Error::WriterError)?;
-        self.writer.write_bytes(v).map(|wb| wb + writted_bytes).map_err(Error::WriterError)
+        let writted_bytes = self
+            .writer
+            .write_bytes(&len.to_be_bytes())
+            .map_err(Error::WriterError)?;
+        self.writer
+            .write_bytes(v)
+            .map(|wb| wb + writted_bytes)
+            .map_err(Error::WriterError)
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, W::Error> {
@@ -178,7 +210,11 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         Self::serialize_u32(self, variant_index)
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<Self::Ok, W::Error>
+    fn serialize_newtype_struct<T: ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, W::Error>
     where
         T: Serialize,
     {
@@ -195,7 +231,10 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     where
         T: Serialize,
     {
-        let written_bytes = self.writer.write_bytes(&variant_index.to_be_bytes()).map_err(Error::WriterError)?;
+        let written_bytes = self
+            .writer
+            .write_bytes(&variant_index.to_be_bytes())
+            .map_err(Error::WriterError)?;
         value.serialize(self).map(|wb| wb + written_bytes)
     }
 
@@ -203,7 +242,10 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         match len {
             Some(len) => {
                 let len: u64 = len as u64;
-                let written_bytes = self.writer.write_bytes(&len.to_be_bytes()).map_err(Error::WriterError)?;
+                let written_bytes = self
+                    .writer
+                    .write_bytes(&len.to_be_bytes())
+                    .map_err(Error::WriterError)?;
                 Ok(SeqSerializer::new_known(self, written_bytes))
             }
             None => SeqSerializer::new_unknown(self),
@@ -242,7 +284,10 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, W::Error> {
-        let written_bytes = self.writer.write_bytes(&variant_index.to_be_bytes()).map_err(Error::WriterError)?;
+        let written_bytes = self
+            .writer
+            .write_bytes(&variant_index.to_be_bytes())
+            .map_err(Error::WriterError)?;
         Ok(SeqSerializer::new_known(self, written_bytes))
     }
 
@@ -250,14 +295,21 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         match len {
             Some(len) => {
                 let len: u64 = len as u64;
-                let written_bytes = self.writer.write_bytes(&len.to_be_bytes()).map_err(Error::WriterError)?;
+                let written_bytes = self
+                    .writer
+                    .write_bytes(&len.to_be_bytes())
+                    .map_err(Error::WriterError)?;
                 Ok(SeqSerializer::new_known(self, written_bytes))
             }
             None => SeqSerializer::new_unknown(self),
         }
     }
 
-    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct, W::Error> {
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, W::Error> {
         Ok(SeqSerializer::new_known(self, 0))
     }
 
@@ -268,14 +320,18 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, W::Error> {
-        let written_bytes = self.writer.write_bytes(&variant_index.to_be_bytes()).map_err(Error::WriterError)?;
+        let written_bytes = self
+            .writer
+            .write_bytes(&variant_index.to_be_bytes())
+            .map_err(Error::WriterError)?;
         Ok(SeqSerializer::new_known(self, written_bytes))
     }
 
     #[cfg(not(feature = "alloc"))]
     fn collect_str<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, W::Error>
     where
-        T: core::fmt::Display {
+        T: core::fmt::Display,
+    {
         todo!()
     }
 }
@@ -284,7 +340,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
 pub enum SeqSerializer<'a, W> {
     KnownSize {
         serializer: &'a mut Serializer<W>,
-        written_bytes: usize
+        written_bytes: usize,
     },
     UnknownSize {
         serializer: &'a mut Serializer<W>,
@@ -296,7 +352,7 @@ pub enum SeqSerializer<'a, W> {
 #[cfg(not(feature = "alloc"))]
 pub struct SeqSerializer<'a, W> {
     serializer: &'a mut Serializer<W>,
-    written_bytes: usize
+    written_bytes: usize,
 }
 
 #[cfg(feature = "alloc")]
@@ -304,7 +360,7 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
     pub fn new_known(serializer: &'a mut Serializer<W>, written_bytes: usize) -> Self {
         Self::KnownSize {
             serializer,
-            written_bytes
+            written_bytes,
         }
     }
 
@@ -323,7 +379,7 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
         match self {
             SeqSerializer::KnownSize {
                 serializer,
-                written_bytes
+                written_bytes,
             } => {
                 *written_bytes += value.serialize(&mut **serializer)?;
                 Ok(())
@@ -331,19 +387,17 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
             SeqSerializer::UnknownSize { count, bytes, .. } => {
                 let mut serializer = Serializer { writer: bytes };
                 *count += 1;
-                value.serialize(&mut serializer).map_err(|err| {
-                    match err {
-                        Error::WriterError(_) => unreachable!(),
-                        Error::Message(x) => Error::Message(x),
-                        Error::Eof => Error::Eof,
-                        Error::InvalidBool(x) => Error::InvalidBool(x),
-                        Error::InvalidChar(x) => Error::InvalidChar(x),
-                        Error::InvalidStr(x) => Error::InvalidStr(x),
-                        Error::InvalidSize => Error::InvalidSize,
-                        Error::InvalidOptionTag(x) => Error::InvalidOptionTag(x),
-                        Error::TrailingBytes(x) => Error::TrailingBytes(x),
-                        Error::Unimplemented(x) => Error::Unimplemented(x),
-                    }
+                value.serialize(&mut serializer).map_err(|err| match err {
+                    Error::WriterError(_) => unreachable!(),
+                    Error::Message(x) => Error::Message(x),
+                    Error::Eof => Error::Eof,
+                    Error::InvalidBool(x) => Error::InvalidBool(x),
+                    Error::InvalidChar(x) => Error::InvalidChar(x),
+                    Error::InvalidStr(x) => Error::InvalidStr(x),
+                    Error::InvalidSize => Error::InvalidSize,
+                    Error::InvalidOptionTag(x) => Error::InvalidOptionTag(x),
+                    Error::TrailingBytes(x) => Error::TrailingBytes(x),
+                    Error::Unimplemented(x) => Error::Unimplemented(x),
                 })?;
                 Ok(())
             }
@@ -358,8 +412,15 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
                 bytes,
                 serializer,
             } => {
-                let written_bytes = serializer.writer.write_bytes(&count.to_be_bytes()).map_err(Error::WriterError)?;
-                serializer.writer.write_bytes(&bytes).map(|wb| wb + written_bytes).map_err(Error::WriterError)
+                let written_bytes = serializer
+                    .writer
+                    .write_bytes(&count.to_be_bytes())
+                    .map_err(Error::WriterError)?;
+                serializer
+                    .writer
+                    .write_bytes(&bytes)
+                    .map(|wb| wb + written_bytes)
+                    .map_err(Error::WriterError)
             }
         }
     }
@@ -370,7 +431,7 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
     pub fn new_known(serializer: &'a mut Serializer<W>, written_bytes: usize) -> Self {
         Self {
             serializer,
-            written_bytes
+            written_bytes,
         }
     }
 

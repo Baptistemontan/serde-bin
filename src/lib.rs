@@ -5,11 +5,11 @@ mod write;
 
 pub use de::{from_bytes, Deserializer};
 pub use error::{Error, Result};
-pub use ser::Serializer;
-#[cfg(feature = "std")]
-pub use ser::to_writer;
 #[cfg(feature = "alloc")]
 pub use ser::to_bytes;
+#[cfg(feature = "std")]
+pub use ser::to_writer;
+pub use ser::{to_buff, Serializer};
 
 #[cfg(test)]
 mod tests {

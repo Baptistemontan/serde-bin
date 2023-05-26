@@ -1,13 +1,15 @@
 // #[cfg(feature = "std")]
+use core::{
+    fmt::{Debug, Display},
+    str::Utf8Error,
+};
 use serde::{de, ser};
 #[cfg(feature = "std")]
 use std::error;
-use core::{str::Utf8Error, fmt::{Display, Debug}};
 #[cfg(feature = "alloc")]
 extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
-
 
 pub type Result<T, We = NoWriterError> = core::result::Result<T, Error<We>>;
 
@@ -65,11 +67,13 @@ impl<T: Display + Debug> Display for Error<T> {
                 remaining
             )),
             Error::Unimplemented(function_name) => f.write_fmt(format_args!(
-                "Use of an unemplemented Deserializer function: {}",
+                "Use of an unimplemented Deserializer function: {}",
                 function_name
             )),
             #[cfg(not(feature = "alloc"))]
-            Error::UnknownSeqLength => todo!(),
+            Error::UnknownSeqLength => f.write_str(
+                "Tried to serialize a sequence with an unknown length in a no alloc env.",
+            ),
         }
     }
 }
@@ -86,7 +90,7 @@ impl<We: Display + Debug> ser::Error for Error<We> {
     {
         Error::Message(msg.to_string())
     }
-    
+
     #[cfg(not(feature = "alloc"))]
     fn custom<T>(_msg: T) -> Self
     where
@@ -105,7 +109,7 @@ impl<We: Display + Debug> de::Error for Error<We> {
     {
         Error::Message(msg.to_string())
     }
-    
+
     #[cfg(not(feature = "alloc"))]
     fn custom<T>(_msg: T) -> Self
     where

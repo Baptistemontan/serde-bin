@@ -3,7 +3,7 @@ use serde::{
     serde_if_integer128, Deserialize,
 };
 
-use crate::error::{Error, Result, NoWriterError};
+use crate::error::{Error, NoWriterError, Result};
 
 pub struct Deserializer<'de> {
     input: &'de [u8],
