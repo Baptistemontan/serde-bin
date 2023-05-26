@@ -3,7 +3,7 @@ use serde::{
     serde_if_integer128, Deserialize,
 };
 
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, NoWriterError};
 
 pub struct Deserializer<'de> {
     input: &'de [u8],
@@ -49,13 +49,13 @@ impl<'de> Deserializer<'de> {
 
     fn parse_str(&mut self) -> Result<&'de str> {
         let bytes = self.pop_bytes_seq()?;
-        let s = std::str::from_utf8(bytes)?;
+        let s = core::str::from_utf8(bytes)?;
         Ok(s)
     }
 }
 
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
-    type Error = Error;
+    type Error = Error<NoWriterError>;
 
     fn is_human_readable(&self) -> bool {
         false
@@ -352,7 +352,7 @@ impl<'a, 'de> SeqDeserializer<'a, 'de> {
 }
 
 impl<'de, 'a> SeqAccess<'de> for SeqDeserializer<'a, 'de> {
-    type Error = Error;
+    type Error = Error<NoWriterError>;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
     where
@@ -369,7 +369,7 @@ impl<'de, 'a> SeqAccess<'de> for SeqDeserializer<'a, 'de> {
 }
 
 impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
-    type Error = Error;
+    type Error = Error<NoWriterError>;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
     where
@@ -393,7 +393,7 @@ impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
 }
 
 impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
-    type Error = Error;
+    type Error = Error<NoWriterError>;
     type Variant = Self;
 
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant)>
@@ -406,7 +406,7 @@ impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
 }
 
 impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
-    type Error = Error;
+    type Error = Error<NoWriterError>;
 
     fn unit_variant(self) -> Result<()> {
         Ok(())

@@ -1,13 +1,19 @@
 mod de;
 mod error;
 mod ser;
+mod write;
 
 pub use de::{from_bytes, Deserializer};
 pub use error::{Error, Result};
-pub use ser::{to_bytes, to_writer, Serializer};
+pub use ser::Serializer;
+#[cfg(feature = "std")]
+pub use ser::to_writer;
+#[cfg(feature = "alloc")]
+pub use ser::to_bytes;
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use serde::{Deserialize, Serialize};
 
@@ -35,7 +41,7 @@ mod tests {
             b: STRING.to_string(),
         };
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let n_bytes = u64::to_be_bytes(N as u64);
@@ -58,7 +64,7 @@ mod tests {
             b: "Hello".to_string(),
         };
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let t: TestStruct = de::from_bytes(&v).unwrap();
@@ -70,7 +76,7 @@ mod tests {
     fn test_serialize_enum_unit() {
         let value = TestEnum::Unit;
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         assert_eq!(v, &[0, 0, 0, 0])
@@ -80,7 +86,7 @@ mod tests {
     fn test_serialize_enum_newtype() {
         let value = TestEnum::NewType(56);
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         assert_eq!(v, &[0, 0, 0, 1, 56])
@@ -92,7 +98,7 @@ mod tests {
         const STRING: &'static str = "String";
         let value = TestEnum::Tuple(NUM, STRING.to_string());
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let variant_index_bytes = 2u32.to_be_bytes();
@@ -118,7 +124,7 @@ mod tests {
             b: VEC.to_vec(),
         };
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let variant_index_bytes = 3u32.to_be_bytes();
@@ -139,7 +145,7 @@ mod tests {
     fn test_serialize_deserialize_enum_unit() {
         let value = TestEnum::Unit;
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
@@ -151,7 +157,7 @@ mod tests {
     fn test_serialize_deserialize_enum_newtype() {
         let value = TestEnum::NewType(56);
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
@@ -165,7 +171,7 @@ mod tests {
         const STRING: &'static str = "String";
         let value = TestEnum::Tuple(NUM, STRING.to_string());
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
@@ -182,7 +188,7 @@ mod tests {
             b: VEC.to_vec(),
         };
 
-        let mut v: Vec<u8> = vec![];
+        let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
 
         let res: TestEnum = de::from_bytes(&v).unwrap();
