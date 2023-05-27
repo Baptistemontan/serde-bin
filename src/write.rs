@@ -8,24 +8,25 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::io;
 
-#[cfg(all(feature = "alloc", not(feature = "std")))]
-use crate::error::NoWriterError;
+use crate::error::{NoWriterError, WriterError};
 
 pub trait Write {
-    type Error: Display + Debug;
-
-    fn write_byte(&mut self, byte: u8) -> Result<(), Self::Error>;
+    type Error: WriterError;
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error>;
+
+    fn write_byte(&mut self, byte: u8) -> Result<usize, Self::Error> {
+        self.write_bytes(&[byte])
+    }
 }
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 impl<'a> Write for &'a mut Vec<u8> {
     type Error = NoWriterError;
 
-    fn write_byte(&mut self, byte: u8) -> Result<(), Self::Error> {
+    fn write_byte(&mut self, byte: u8) -> Result<usize, Self::Error> {
         self.push(byte);
-        Ok(())
+        Ok(1)
     }
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {
@@ -37,11 +38,6 @@ impl<'a> Write for &'a mut Vec<u8> {
 #[cfg(feature = "std")]
 impl<W: io::Write> Write for W {
     type Error = io::Error;
-
-    fn write_byte(&mut self, byte: u8) -> Result<(), Self::Error> {
-        self.write_all(&[byte])?;
-        Ok(())
-    }
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {
         self.write_all(bytes)?;
@@ -63,6 +59,8 @@ impl<'a> BuffWriter<'a> {
 #[derive(Debug, Clone, Copy)]
 pub struct EndOfBuff;
 
+impl WriterError for EndOfBuff {}
+
 impl Display for EndOfBuff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Reached end of buffer before end of serialization.")
@@ -72,11 +70,11 @@ impl Display for EndOfBuff {
 impl<'a> Write for BuffWriter<'a> {
     type Error = EndOfBuff;
 
-    fn write_byte(&mut self, byte: u8) -> Result<(), Self::Error> {
+    fn write_byte(&mut self, byte: u8) -> Result<usize, Self::Error> {
         let spot = self.buff.get_mut(self.head).ok_or(EndOfBuff)?;
         *spot = byte;
         self.head += 1;
-        Ok(())
+        Ok(1)
     }
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {
@@ -85,6 +83,16 @@ impl<'a> Write for BuffWriter<'a> {
             .get_mut(self.head..self.head + bytes.len())
             .ok_or(EndOfBuff)?;
         spot.copy_from_slice(bytes);
+        Ok(bytes.len())
+    }
+}
+
+pub struct DummyWriter;
+
+impl<'a> Write for DummyWriter {
+    type Error = NoWriterError;
+
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {
         Ok(bytes.len())
     }
 }

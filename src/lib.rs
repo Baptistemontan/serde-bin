@@ -9,9 +9,9 @@ pub use error::{Error, Result};
 pub use ser::to_bytes;
 #[cfg(feature = "std")]
 pub use ser::to_writer;
-pub use ser::{to_buff, Serializer};
+pub use ser::{get_serialized_size, to_buff, Serializer};
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-utils"))]
 mod tests {
 
     use super::*;

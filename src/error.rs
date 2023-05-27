@@ -16,6 +16,10 @@ pub type Result<T, We = NoWriterError> = core::result::Result<T, Error<We>>;
 #[derive(Debug)]
 pub enum NoWriterError {}
 
+pub trait WriterError: Debug + Display {}
+
+impl WriterError for NoWriterError {}
+
 impl Display for NoWriterError {
     fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         unreachable!()
@@ -37,6 +41,31 @@ pub enum Error<T: Debug> {
     InvalidOptionTag(u8),
     TrailingBytes(usize),
     Unimplemented(&'static str),
+}
+
+impl<W: WriterError> Error<W> {
+    pub fn map_writer_error<We, F>(self, map_fn: F) -> Error<We>
+    where
+        We: WriterError,
+        F: FnOnce(W) -> We,
+    {
+        match self {
+            Error::WriterError(err) => Error::WriterError(map_fn(err)),
+            Error::Message(x) => Error::Message(x),
+            Error::Eof => Error::Eof,
+            Error::InvalidBool(x) => Error::InvalidBool(x),
+            Error::InvalidChar(x) => Error::InvalidChar(x),
+            Error::InvalidStr(x) => Error::InvalidStr(x),
+            Error::InvalidSize => Error::InvalidSize,
+            Error::InvalidOptionTag(x) => Error::InvalidOptionTag(x),
+            Error::TrailingBytes(x) => Error::TrailingBytes(x),
+            Error::Unimplemented(x) => Error::Unimplemented(x),
+        }
+    }
+
+    pub fn unwrap_writer_error<We: WriterError>(self) -> Error<We> {
+        self.map_writer_error(|err| panic!("{}", err))
+    }
 }
 
 impl<T: Display + Debug> Display for Error<T> {
@@ -124,3 +153,12 @@ impl<We: Debug> From<Utf8Error> for Error<We> {
         Error::InvalidStr(value)
     }
 }
+
+impl<We: WriterError> From<We> for Error<We> {
+    fn from(value: We) -> Self {
+        Error::WriterError(value)
+    }
+}
+
+#[cfg(feature = "std")]
+impl WriterError for std::io::Error {}
