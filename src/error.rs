@@ -31,7 +31,7 @@ pub enum Error<T: Debug> {
     WriterError(T),
     #[cfg(feature = "alloc")]
     Message(String),
-    #[cfg(not(feature = "alloc"))]
+    #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
     UnknownSeqLength,
     Eof,
     InvalidBool(u8),
@@ -51,6 +51,7 @@ impl<W: WriterError> Error<W> {
     {
         match self {
             Error::WriterError(err) => Error::WriterError(map_fn(err)),
+            #[cfg(feature = "alloc")]
             Error::Message(x) => Error::Message(x),
             Error::Eof => Error::Eof,
             Error::InvalidBool(x) => Error::InvalidBool(x),
@@ -60,6 +61,8 @@ impl<W: WriterError> Error<W> {
             Error::InvalidOptionTag(x) => Error::InvalidOptionTag(x),
             Error::TrailingBytes(x) => Error::TrailingBytes(x),
             Error::Unimplemented(x) => Error::Unimplemented(x),
+            #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
+            Error::UnknownSeqLength => Error::UnknownSeqLength,
         }
     }
 
@@ -99,7 +102,7 @@ impl<T: Display + Debug> Display for Error<T> {
                 "Use of an unimplemented Deserializer function: {}",
                 function_name
             )),
-            #[cfg(not(feature = "alloc"))]
+            #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
             Error::UnknownSeqLength => f.write_str(
                 "Tried to serialize a sequence with an unknown length in a no alloc env.",
             ),
@@ -110,7 +113,6 @@ impl<T: Display + Debug> Display for Error<T> {
 #[cfg(feature = "std")]
 impl<We: Display + Debug> error::Error for Error<We> {}
 
-// #[cfg(feature = "std")]
 impl<We: Display + Debug> ser::Error for Error<We> {
     #[cfg(feature = "alloc")]
     fn custom<T>(msg: T) -> Self
@@ -129,7 +131,6 @@ impl<We: Display + Debug> ser::Error for Error<We> {
     }
 }
 
-// #[cfg(feature = "std")]
 impl<We: Display + Debug> de::Error for Error<We> {
     #[cfg(feature = "alloc")]
     fn custom<T>(msg: T) -> Self

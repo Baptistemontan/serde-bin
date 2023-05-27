@@ -269,7 +269,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", not(feature = "no-unsized-seq")))]
 pub enum SeqSerializer<'a, W> {
     KnownSize {
         serializer: &'a mut Serializer<W>,
@@ -282,13 +282,13 @@ pub enum SeqSerializer<'a, W> {
     },
 }
 
-#[cfg(not(feature = "alloc"))]
+#[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
 pub struct SeqSerializer<'a, W> {
     serializer: &'a mut Serializer<W>,
     written_bytes: usize,
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", not(feature = "no-unsized-seq")))]
 impl<'a, W: Write> SeqSerializer<'a, W> {
     pub fn new_known(serializer: &'a mut Serializer<W>, written_bytes: usize) -> Self {
         Self::KnownSize {
@@ -347,7 +347,7 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
     }
 }
 
-#[cfg(not(feature = "alloc"))]
+#[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
 impl<'a, W: Write> SeqSerializer<'a, W> {
     pub fn new_known(serializer: &'a mut Serializer<W>, written_bytes: usize) -> Self {
         Self {

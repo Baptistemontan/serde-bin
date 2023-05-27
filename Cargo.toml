@@ -12,6 +12,7 @@ serde = { version = "1.0.163", default-features = false }
 default = ["std"]
 alloc = ["serde/alloc"]
 std = ["alloc", "serde/std"]
+no-unsized-seq = []
 test-utils = ["std", "serde/derive"]
 
 [dev-dependencies]
