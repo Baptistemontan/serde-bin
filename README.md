@@ -31,7 +31,7 @@ Maps are a sequences of key-value pairs, so they are treated as sequences where 
 Sequences with an unknown length are first serialized in an allocated buffer (a `Vec<u8>`), 
 the number of items serialized is counted. When the sequence is finished, the length is written and the buffer is flushed. 
 This means that for sequences with unknown length, dynamic allocation is needed. 
-(This is the only part where alloc is needed in the entire lib, the lib is technicaly already no-std, but not no-alloc, working on feature flags to enable a no-alloc env)
+This is only done if the `alloc` or `std` feature is enabled
 
 ### Unit
 
@@ -71,4 +71,10 @@ If the option contain a value, the value is then serialized after it.
 ### Enum
 
 For serializing Enums, a tag is first written down as a `u32`. Then the variant is serialized depending on its categorie (unit, newtype, tuple, struct).
+
+
+## Features
+- `std`: Enable the use of the std-lib and also enable the `alloc` feature. Writers implementing `io::Write` can be used
+- `alloc`: Enable the use of the `alloc` crate, when enabled sequences with unknown size can be serialized.
+- `test-utils`: Enable the required features needed for the crate tests such as `std` and `serde/derive` 
 
