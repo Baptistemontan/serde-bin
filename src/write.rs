@@ -89,7 +89,7 @@ impl<'a> Write for BuffWriter<'a> {
 
 pub struct DummyWriter;
 
-impl<'a> Write for DummyWriter {
+impl Write for DummyWriter {
     type Error = NoWriterError;
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {

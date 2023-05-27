@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn test_serialize_enum_tuple() {
         const NUM: f32 = 12.3;
-        const STRING: &'static str = "String";
+        const STRING: &str = "String";
         let value = TestEnum::Tuple(NUM, STRING.to_string());
 
         let mut v: Vec<u8> = Vec::new();
@@ -130,7 +130,7 @@ mod tests {
         let variant_index_bytes = 3u32.to_be_bytes();
         let fbytes = NUM.to_be_bytes();
         let len_bytes = (VEC.len() as u64).to_be_bytes();
-        let vec_bytes = VEC.iter().copied().map(u16::to_be_bytes).flatten();
+        let vec_bytes = VEC.iter().copied().flat_map(u16::to_be_bytes);
         let vt = variant_index_bytes
             .into_iter()
             .chain(fbytes)
@@ -168,7 +168,7 @@ mod tests {
     #[test]
     fn test_serialize_deserialize_enum_tuple() {
         const NUM: f32 = 12.3;
-        const STRING: &'static str = "String";
+        const STRING: &str = "String";
         let value = TestEnum::Tuple(NUM, STRING.to_string());
 
         let mut v: Vec<u8> = Vec::new();
