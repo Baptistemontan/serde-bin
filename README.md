@@ -74,7 +74,8 @@ For serializing Enums, a tag is first written down as a `u32`. Then the variant 
 
 
 ## Features
+- default: The `std` feature is enabled by default.
 - `std`: Enable the use of the std-lib and also enable the `alloc` feature. Writers implementing `io::Write` can be used
 - `alloc`: Enable the use of the `alloc` crate, when enabled sequences with unknown size can be serialized.
-- `test-utils`: Enable the required features needed for the crate tests such as `std` and `serde/derive` 
-
+- `no-unsized-seq`: Disable the serialization of sequences with unknown size when the `alloc` or `std` feature is enabled.
+- `test-utils`: Enable the features needed for the crate tests such as `std` and `serde/derive`
