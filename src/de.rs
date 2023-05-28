@@ -304,6 +304,10 @@ impl<'de, 'a> SeqAccess<'de> for SeqDeserializer<'a, 'de> {
 
         seed.deserialize(&mut *self.de).map(Some)
     }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.remaining)
+    }
 }
 
 impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
@@ -327,6 +331,10 @@ impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
         V: de::DeserializeSeed<'de>,
     {
         seed.deserialize(&mut *self.de)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.remaining)
     }
 }
 
