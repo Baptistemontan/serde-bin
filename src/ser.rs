@@ -5,6 +5,7 @@ use std::io;
 
 use crate::error::{Error, NoWriterError, Result};
 use crate::write::{BuffWriter, DummyWriter, EndOfBuff, Write};
+use core::fmt;
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -260,12 +261,13 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         Ok(SeqSerializer::new_known(self, written_bytes))
     }
 
-    #[cfg(not(feature = "alloc"))]
-    fn collect_str<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, W::Error>
+    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, W::Error>
     where
-        T: core::fmt::Display,
+        T: fmt::Display,
     {
-        unimplemented!()
+        let mut collector = StrCollector::new(&mut self.writer);
+        fmt::write(&mut collector, format_args!("{}", value))?;
+        Ok(collector.written_bytes)
     }
 }
 
@@ -496,5 +498,31 @@ impl<'a, W: Write> ser::SerializeStructVariant for SeqSerializer<'a, W> {
 
     fn end(self) -> Result<Self::Ok, W::Error> {
         self.finish()
+    }
+}
+
+struct StrCollector<'a, W> {
+    writer: &'a mut W,
+    written_bytes: usize,
+}
+
+impl<'a, W: Write> StrCollector<'a, W> {
+    pub fn new(writer: &'a mut W) -> Self {
+        StrCollector {
+            writer,
+            written_bytes: 0,
+        }
+    }
+}
+
+impl<'a, W: Write> fmt::Write for StrCollector<'a, W> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        match self.writer.write_bytes(s.as_bytes()) {
+            Ok(written_bytes) => {
+                self.written_bytes += written_bytes;
+                Ok(())
+            }
+            Err(_) => Err(fmt::Error),
+        }
     }
 }

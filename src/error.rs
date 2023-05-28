@@ -1,6 +1,6 @@
 // #[cfg(feature = "std")]
 use core::{
-    fmt::{Debug, Display},
+    fmt::{self, Debug, Display},
     str::Utf8Error,
 };
 use serde::{de, ser};
@@ -26,11 +26,20 @@ impl Display for NoWriterError {
     }
 }
 
+#[cfg(not(feature = "alloc"))]
+#[derive(Debug)]
+pub enum ErrorKind {
+    Serialization,
+    Deserialization,
+}
+
 #[derive(Debug)]
 pub enum Error<T: Debug> {
     WriterError(T),
     #[cfg(feature = "alloc")]
     Message(String),
+    #[cfg(not(feature = "alloc"))]
+    Custom(ErrorKind),
     #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
     UnknownSeqLength,
     Eof,
@@ -41,6 +50,7 @@ pub enum Error<T: Debug> {
     InvalidOptionTag(u8),
     TrailingBytes(usize),
     Unimplemented(&'static str),
+    FormattingError,
 }
 
 impl<W: WriterError> Error<W> {
@@ -53,6 +63,10 @@ impl<W: WriterError> Error<W> {
             Error::WriterError(err) => Error::WriterError(map_fn(err)),
             #[cfg(feature = "alloc")]
             Error::Message(x) => Error::Message(x),
+            #[cfg(not(feature = "alloc"))]
+            Error::Custom(kind) => Error::Custom(kind),
+            #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
+            Error::UnknownSeqLength => Error::UnknownSeqLength,
             Error::Eof => Error::Eof,
             Error::InvalidBool(x) => Error::InvalidBool(x),
             Error::InvalidChar(x) => Error::InvalidChar(x),
@@ -61,8 +75,7 @@ impl<W: WriterError> Error<W> {
             Error::InvalidOptionTag(x) => Error::InvalidOptionTag(x),
             Error::TrailingBytes(x) => Error::TrailingBytes(x),
             Error::Unimplemented(x) => Error::Unimplemented(x),
-            #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
-            Error::UnknownSeqLength => Error::UnknownSeqLength,
+            Error::FormattingError => Error::FormattingError,
         }
     }
 
@@ -77,6 +90,18 @@ impl<T: Display + Debug> Display for Error<T> {
             Error::WriterError(w_err) => Display::fmt(w_err, f),
             #[cfg(feature = "alloc")]
             Error::Message(msg) => f.write_str(msg),
+            #[cfg(not(feature = "alloc"))]
+            Error::Custom(ErrorKind::Serialization) => {
+                f.write_str("An error occured during serialization.")
+            }
+            #[cfg(not(feature = "alloc"))]
+            Error::Custom(ErrorKind::Deserialization) => {
+                f.write_str("An error occured during deserialization.")
+            }
+            #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
+            Error::UnknownSeqLength => f.write_str(
+                "Tried to serialize a sequence with an unknown length in a no alloc env.",
+            ),
             Error::Eof => f.write_str("Reached EOF before end of deserialization"),
             Error::InvalidBool(byte) => f.write_fmt(format_args!(
                 "Error deserializing bool: Expecting 0 or 1, found {}",
@@ -102,10 +127,7 @@ impl<T: Display + Debug> Display for Error<T> {
                 "Use of an unimplemented Deserializer function: {}",
                 function_name
             )),
-            #[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
-            Error::UnknownSeqLength => f.write_str(
-                "Tried to serialize a sequence with an unknown length in a no alloc env.",
-            ),
+            Error::FormattingError => f.write_str("An error occured while formatting a value."),
         }
     }
 }
@@ -127,7 +149,7 @@ impl<We: Display + Debug> ser::Error for Error<We> {
     where
         T: Display,
     {
-        todo!()
+        Error::Custom(ErrorKind::Serialization)
     }
 }
 
@@ -145,7 +167,7 @@ impl<We: Display + Debug> de::Error for Error<We> {
     where
         T: Display,
     {
-        todo!()
+        Error::Custom(ErrorKind::Deserialization)
     }
 }
 
@@ -158,6 +180,12 @@ impl<We: Debug> From<Utf8Error> for Error<We> {
 impl<We: WriterError> From<We> for Error<We> {
     fn from(value: We) -> Self {
         Error::WriterError(value)
+    }
+}
+
+impl<We: Debug> From<fmt::Error> for Error<We> {
+    fn from(_value: fmt::Error) -> Self {
+        Error::FormattingError
     }
 }
 
