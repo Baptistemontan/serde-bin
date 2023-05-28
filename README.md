@@ -18,8 +18,31 @@ Booleans are written with 1 byte, containing either `0` or `1`, any other value 
 
 Sequences are represented as such:
 
- - The length of the sequence is written as a u64.
+ - The number of elements in the sequence is written as a u64 (number of elements is'nt always number of bytes.)
  - All elements are then serialized.
+
+
+### Strings
+
+Strings are treated as sequences of bytes, so they are encoded as such. The length is in bytes, not in characters count.
+
+There is one case where the format is different, some types are serialized by serde using their `fmt::Display` implementation,
+the default behavior for serde is to create a string and feed that to the formatter, and then serialize the string.
+But for optimization and avoid allocation, we can feed the writer directly to the formatter, 
+but the formatter does'nt feed the writer with all the bytes in one go so the length of the string is unknown at the beggining of it's serialization.
+To avoid this problem we can use a solution like a null terminated string, but `NUL` is a valid UTF-8 char, so we can't just set the end byte with `0u8`, but `u8::MAX` is not valid UTF-8, so we can use that. 
+So we set the length to `u64::MAX`, and end sequence with `u8::MAX`.
+
+```
+| length (u64::MAX) |  bytes (UTF-8)  | end byte (u8::MAX) |
+|      u8 * 8       |      u8 * ?     |         u8         |
+```
+
+Such fomat can't be implemented for regular sequences, as the types in the sequences produces any bytes, so there is no end marker that we can be sure it would be unique in the bytes produced.
+
+### Char
+
+Chars are for now converted to a `u32` and serialized as such, might be serialized in UTF-8 in the future.
 
 #### Maps
 

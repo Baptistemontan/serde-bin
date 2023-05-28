@@ -265,9 +265,14 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     where
         T: fmt::Display,
     {
+        // unknown str length marker
+        let mut written_bytes = self.writer.write_bytes(&u64::MAX.to_be_bytes())?;
         let mut collector = StrCollector::new(&mut self.writer);
         fmt::write(&mut collector, format_args!("{}", value))?;
-        Ok(collector.written_bytes)
+        written_bytes += collector.written_bytes;
+        // "null" terminated str
+        written_bytes += self.writer.write_byte(u8::MAX)?;
+        Ok(written_bytes)
     }
 }
 

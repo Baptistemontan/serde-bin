@@ -44,14 +44,40 @@ impl<'de> Deserializer<'de> {
     }
 
     fn pop_bytes_seq(&mut self) -> Result<&'de [u8]> {
-        self.pop_usize().and_then(|len| self.pop_slice(len))
+        let len = self.pop_usize()?;
+        self.pop_slice(len)
     }
 
     fn parse_str(&mut self) -> Result<&'de str> {
-        let bytes = self.pop_bytes_seq()?;
+        let len_bytes = self.pop_n()?;
+        let len = u64::from_be_bytes(len_bytes);
+        let len = if len == u64::MAX {
+            // unknown str length, "null" terminated
+            self.input
+                .iter()
+                .copied()
+                .position(|byte| byte == u8::MAX)
+                .ok_or(Error::Eof)?
+        } else {
+            len.try_into().map_err(|_| Error::InvalidSize)?
+        };
+
+        let bytes = self.pop_slice(len)?;
         let s = core::str::from_utf8(bytes)?;
         Ok(s)
     }
+}
+
+macro_rules! implement_number {
+    ($fn_name:ident, $visitor_fn_name:ident, $t:ident) => {
+        fn $fn_name<V>(self, visitor: V) -> Result<V::Value>
+        where
+            V: Visitor<'de>,
+        {
+            let bytes = self.pop_n()?;
+            visitor.$visitor_fn_name($t::from_be_bytes(bytes))
+        }
+    };
 }
 
 impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
@@ -82,108 +108,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
     }
 
-    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_i8(i8::from_be_bytes(bytes))
-    }
-
-    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_i16(i16::from_be_bytes(bytes))
-    }
-
-    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_i32(i32::from_be_bytes(bytes))
-    }
-
-    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_i64(i64::from_be_bytes(bytes))
-    }
+    implement_number!(deserialize_i8, visit_i8, i8);
+    implement_number!(deserialize_i16, visit_i16, i16);
+    implement_number!(deserialize_i32, visit_i32, i32);
+    implement_number!(deserialize_i64, visit_i64, i64);
+    implement_number!(deserialize_u8, visit_u8, u8);
+    implement_number!(deserialize_u16, visit_u16, u16);
+    implement_number!(deserialize_u32, visit_u32, u32);
+    implement_number!(deserialize_u64, visit_u64, u64);
+    implement_number!(deserialize_f32, visit_f32, f32);
+    implement_number!(deserialize_f64, visit_f64, f64);
 
     serde_if_integer128! {
-
-        fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
-        where
-            V: Visitor<'de>
-        {
-            let bytes = self.pop_n()?;
-            visitor.visit_i128(i128::from_be_bytes(bytes))
-        }
-
-    }
-
-    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_u8(u8::from_be_bytes(bytes))
-    }
-
-    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_u16(u16::from_be_bytes(bytes))
-    }
-
-    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_u32(u32::from_be_bytes(bytes))
-    }
-
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_u64(u64::from_be_bytes(bytes))
-    }
-
-    serde_if_integer128! {
-
-        fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
-        where
-            V: Visitor<'de>
-        {
-            let bytes = self.pop_n()?;
-            visitor.visit_u128(u128::from_be_bytes(bytes))
-        }
-
-    }
-
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_f32(f32::from_be_bytes(bytes))
-    }
-
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        let bytes = self.pop_n()?;
-        visitor.visit_f64(f64::from_be_bytes(bytes))
+        implement_number!(deserialize_i128, visit_i128, i128);
+        implement_number!(deserialize_u128, visit_u128, u128);
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
