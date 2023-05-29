@@ -4,12 +4,13 @@ mod ser;
 mod write;
 
 pub use de::{from_bytes, Deserializer};
-pub use error::{Error, Result};
+pub use error::{Error, NoWriterError, Result, WriterError};
 #[cfg(feature = "alloc")]
 pub use ser::to_bytes;
 #[cfg(feature = "std")]
 pub use ser::to_writer;
 pub use ser::{get_serialized_size, to_buff, Serializer};
+pub use write::{BuffWriter, EndOfBuff, Write};
 
 #[cfg(all(test, feature = "test-utils"))]
 mod tests {
