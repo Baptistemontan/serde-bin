@@ -1,4 +1,5 @@
 use core::fmt::{Debug, Display};
+use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -16,7 +17,7 @@ pub trait Write {
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error>;
 
     fn write_byte(&mut self, byte: u8) -> Result<usize, Self::Error> {
-        self.write_bytes(&[byte])
+        self.write_bytes(core::slice::from_ref(&byte))
     }
 }
 
@@ -54,6 +55,36 @@ impl<'a> BuffWriter<'a> {
     pub fn new(buff: &'a mut [u8]) -> Self {
         BuffWriter { buff, head: 0 }
     }
+
+    pub fn unwrap(self) -> (usize, &'a mut [u8]) {
+        (self.head, self.buff)
+    }
+
+    pub fn len(&self) -> usize {
+        self.head
+    }
+
+    pub fn get(&self) -> &[u8] {
+        &self.buff[..self.head]
+    }
+
+    pub fn get_mut(&mut self) -> &mut [u8] {
+        &mut self.buff[..self.head]
+    }
+}
+
+impl<'a> Deref for BuffWriter<'a> {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.get()
+    }
+}
+
+impl<'a> DerefMut for BuffWriter<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.get_mut()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -67,15 +98,8 @@ impl Display for EndOfBuff {
     }
 }
 
-impl<'a> Write for BuffWriter<'a> {
+impl<'a, 'b> Write for &'a mut BuffWriter<'b> {
     type Error = EndOfBuff;
-
-    fn write_byte(&mut self, byte: u8) -> Result<usize, Self::Error> {
-        let spot = self.buff.get_mut(self.head).ok_or(EndOfBuff)?;
-        *spot = byte;
-        self.head += 1;
-        Ok(1)
-    }
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<usize, Self::Error> {
         let spot = self

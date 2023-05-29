@@ -3,7 +3,7 @@ use serde::{ser, serde_if_integer128, Serialize};
 #[cfg(feature = "std")]
 use std::io;
 
-use crate::error::{Error, NoWriterError, Result};
+use crate::error::{Error, Result};
 use crate::write::{BuffWriter, DummyWriter, EndOfBuff, Write};
 use core::fmt;
 
@@ -40,7 +40,7 @@ where
 }
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
-pub fn to_bytes<T>(value: &T) -> Result<Vec<u8>, NoWriterError>
+pub fn to_bytes<T>(value: &T) -> Result<Vec<u8>>
 where
     T: Serialize,
 {
@@ -59,15 +59,16 @@ where
     Ok(output)
 }
 
-pub fn to_buff<T>(value: &T, buff: &mut [u8]) -> Result<usize, EndOfBuff>
+pub fn to_buff<'a, T>(value: &T, buff: &'a mut [u8]) -> Result<BuffWriter<'a>, EndOfBuff>
 where
     T: Serialize,
 {
-    let buff_writer = BuffWriter::new(buff);
-    Serializer::to_writer(value, buff_writer)
+    let mut buff_writer = BuffWriter::new(buff);
+    Serializer::to_writer(value, &mut buff_writer)?;
+    Ok(buff_writer)
 }
 
-pub fn get_serialized_size<T>(value: &T) -> Result<usize, NoWriterError>
+pub fn get_serialized_size<T>(value: &T) -> Result<usize>
 where
     T: Serialize,
 {
