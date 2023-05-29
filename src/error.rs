@@ -13,7 +13,7 @@ use alloc::string::{String, ToString};
 
 pub type Result<T, We = NoWriterError> = core::result::Result<T, Error<We>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NoWriterError {}
 
 pub trait WriterError: Debug + Display {}
@@ -22,19 +22,21 @@ impl WriterError for NoWriterError {}
 
 impl Display for NoWriterError {
     fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // NoWritterError is an enum with no variant, it can't be created.
+        // So calling this function is impossible
         unreachable!()
     }
 }
 
 #[cfg(not(feature = "alloc"))]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum ErrorKind {
     Serialization,
     Deserialization,
 }
 
-#[derive(Debug)]
-pub enum Error<T: Debug> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error<T> {
     WriterError(T),
     #[cfg(feature = "alloc")]
     Message(String),
@@ -84,7 +86,7 @@ impl<W: WriterError> Error<W> {
     }
 }
 
-impl<T: Display + Debug> Display for Error<T> {
+impl<T: Display> Display for Error<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::WriterError(w_err) => Display::fmt(w_err, f),
@@ -171,7 +173,7 @@ impl<We: Display + Debug> de::Error for Error<We> {
     }
 }
 
-impl<We: Debug> From<Utf8Error> for Error<We> {
+impl<We> From<Utf8Error> for Error<We> {
     fn from(value: Utf8Error) -> Self {
         Error::InvalidStr(value)
     }
@@ -183,7 +185,7 @@ impl<We: WriterError> From<We> for Error<We> {
     }
 }
 
-impl<We: Debug> From<fmt::Error> for Error<We> {
+impl<We> From<fmt::Error> for Error<We> {
     fn from(_value: fmt::Error) -> Self {
         Error::FormattingError
     }

@@ -91,7 +91,7 @@ impl<'a> DerefMut for BuffWriter<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EndOfBuff;
 
 impl WriterError for EndOfBuff {}
