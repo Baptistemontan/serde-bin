@@ -64,6 +64,10 @@ impl<'a> BuffWriter<'a> {
         self.head
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.head == 0
+    }
+
     pub fn get(&self) -> &[u8] {
         &self.buff[..self.head]
     }
