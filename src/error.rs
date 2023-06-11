@@ -1,4 +1,3 @@
-// #[cfg(feature = "std")]
 use core::{
     fmt::{self, Debug, Display},
     str::Utf8Error,
@@ -10,6 +9,8 @@ use std::error;
 extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
+
+use crate::any::TagParsingError;
 
 pub type Result<T, We = NoWriterError> = core::result::Result<T, Error<We>>;
 
@@ -53,6 +54,11 @@ pub enum Error<T> {
     TrailingBytes(usize),
     Unimplemented(&'static str),
     FormattingError,
+    TagParsingError(TagParsingError),
+    SeqSizeMismatch {
+        expected: usize,
+        got: usize,
+    },
 }
 
 impl<W: WriterError> Error<W> {
@@ -78,6 +84,8 @@ impl<W: WriterError> Error<W> {
             Error::TrailingBytes(x) => Error::TrailingBytes(x),
             Error::Unimplemented(x) => Error::Unimplemented(x),
             Error::FormattingError => Error::FormattingError,
+            Error::TagParsingError(err) => Error::TagParsingError(err),
+            Error::SeqSizeMismatch { expected, got } => Error::SeqSizeMismatch { expected, got },
         }
     }
 
@@ -130,6 +138,8 @@ impl<T: Display> Display for Error<T> {
                 function_name
             )),
             Error::FormattingError => f.write_str("An error occured while formatting a value."),
+            Error::TagParsingError(err) => Display::fmt(err, f),
+            Error::SeqSizeMismatch { expected, got } => f.write_fmt(format_args!("Error deserializing a sequence, expected size was {} but encoded sequence size was {}", expected, got)),
         }
     }
 }
