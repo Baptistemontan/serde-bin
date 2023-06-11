@@ -30,8 +30,8 @@ macro_rules! unexpected_tag {
 }
 
 macro_rules! check_tag {
-    ($tag:pat, $self:ident, $expected:expr) => {{
-        match $self.pop_tag()? {
+    ($tag:pat, $input_tag:expr, $expected:expr) => {{
+        match $input_tag {
             popped_tag @ $tag => popped_tag,
             got => return Err(TagParsingError::unexpected($expected, got).into()),
         }
@@ -44,7 +44,7 @@ macro_rules! implement_number {
         where
             V: Visitor<'de>,
         {
-            check_tag!($expected_tag, self, $expected);
+            check_tag!($expected_tag, self.pop_tag()?, $expected);
             let bytes = self.pop_n()?;
             visitor.$visitor_fn_name($t::from_be_bytes(bytes))
         }
@@ -135,7 +135,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Tuple, self, "Tuple");
+        check_tag!(Tag::Tuple, self.pop_tag()?, "Tuple");
         let [len] = self.pop_n()?;
         visitor.visit_seq(SeqDeserializer::new_with_len(self, len.into()))
     }
@@ -144,7 +144,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::TupleStruct, self, "TupleStruct");
+        check_tag!(Tag::TupleStruct, self.pop_tag()?, "TupleStruct");
         let [len] = self.pop_n()?;
         visitor.visit_seq(SeqDeserializer::new_with_len(self, len.into()))
     }
@@ -153,7 +153,7 @@ impl<'de> Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Struct, self, "Struct");
+        check_tag!(Tag::Struct, self.pop_tag()?, "Struct");
         let de = StructDeserializer::new(self)?;
         visitor.visit_map(de)
     }
@@ -277,7 +277,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::ByteArray, self, "ByteArray");
+        check_tag!(Tag::ByteArray, self.pop_tag()?, "ByteArray");
         let len = self.pop_usize()?;
         let bytes = self.pop_slice(len)?;
         visitor.visit_bytes(bytes)
@@ -305,7 +305,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Unit, self, "Unit");
+        check_tag!(Tag::Unit, self.pop_tag()?, "Unit");
         visitor.visit_unit()
     }
 
@@ -313,7 +313,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::UnitStruct, self, "UnitStruct");
+        check_tag!(Tag::UnitStruct, self.pop_tag()?, "UnitStruct");
         visitor.visit_unit()
     }
 
@@ -321,7 +321,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::NewTypeStruct, self, "NewTypeStruct");
+        check_tag!(Tag::NewTypeStruct, self.pop_tag()?, "NewTypeStruct");
         visitor.visit_newtype_struct(self)
     }
 
@@ -341,7 +341,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Tuple, self, "Tuple");
+        check_tag!(Tag::Tuple, self.pop_tag()?, "Tuple");
         let [encoded_len] = self.pop_n()?;
         let encoded_len: usize = encoded_len.into();
         if len != encoded_len {
@@ -362,7 +362,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::TupleStruct, self, "TupleStruct");
+        check_tag!(Tag::TupleStruct, self.pop_tag()?, "TupleStruct");
         let [encoded_len] = self.pop_n()?;
         let encoded_len: usize = encoded_len.into();
         if len != encoded_len {
@@ -395,7 +395,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Struct, self, "Struct");
+        check_tag!(Tag::Struct, self.pop_tag()?, "Struct");
         let len = fields.len();
         let [encoded_len] = self.pop_n()?;
         let encoded_len: usize = encoded_len.into();
@@ -419,7 +419,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         check_tag!(
             Tag::UnitVariant | Tag::NewTypeVariant | Tag::TupleVariant | Tag::StructVariant,
-            self,
+            self.peek_tag()?,
             "Enum"
         );
         visitor.visit_enum(self)
@@ -429,8 +429,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        let bytes = self.pop_n()?;
-        visitor.visit_u32(u32::from_be_bytes(bytes))
+        match_tag! {
+            self.pop_tag()?, "Identifier",
+            Tag::UnitVariant | Tag::NewTypeVariant | Tag::TupleVariant | Tag::StructVariant => {
+                let bytes = self.pop_n()?;
+                visitor.visit_u32(u32::from_be_bytes(bytes))
+            }
+            Tag::String => {
+                let s = self.parse_known_len_str()?;
+                visitor.visit_borrowed_str(s)
+            }
+        }
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>

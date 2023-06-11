@@ -198,6 +198,26 @@ mod tests {
         Struct { num: usize },
     }
 
+    // #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    // struct TestBorrow<'a, 'b> {
+    //     name: &'a str,
+    //     bytes: &'b [u8],
+    // }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct FlattenTestInner {
+        name: String,
+        age: u32,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct FlattenTest {
+        a: char,
+        b: String,
+        #[serde(flatten)]
+        c: FlattenTestInner,
+    }
+
     #[test]
     fn test_serialize_struct() {
         const N: usize = 56;
@@ -482,5 +502,66 @@ mod tests {
         let res: UntaggedEnum = de::from_bytes(&v).unwrap();
 
         assert_eq!(value, res);
+    }
+
+    // #[test]
+    // fn test_serialize_deserialize_borrowed() {
+    //     let value = TestBorrow {
+    //         name: "john",
+    //         bytes: b"doe",
+    //     };
+
+    //     let mut v: Vec<u8> = Vec::new();
+    //     ser::to_writer(&value, &mut v).unwrap();
+
+    //     let res: TestBorrow = de::from_bytes(&v).unwrap();
+
+    //     assert_eq!(value, res);
+    // }
+
+    #[test]
+    fn test_serialize_deserialize_flattened() {
+        let value = FlattenTest {
+            a: 'c',
+            b: "foo".into(),
+            c: FlattenTestInner {
+                name: "john".into(),
+                age: 32,
+            },
+        };
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&value, &mut v).unwrap();
+
+        let res: FlattenTest = de::from_bytes(&v).unwrap();
+
+        assert_eq!(value, res);
+
+        //  [
+        //      33,                        Unsized map
+        //      18,                        string
+        //      0, 0, 0, 0, 0, 0, 0, 1,    size 1
+        //      97,                        "a"
+        //      14,                        char 1
+        //      99,                        c
+        //      18,                        string
+        //      0, 0, 0, 0, 0, 0, 0, 1,    size 1
+        //      98,                        "b"
+        //      18,                        string
+        //      0, 0, 0, 0, 0, 0, 0, 3,    size 3
+        //      102, 111, 111,             "foo"
+        //      18,                        string
+        //      0, 0, 0, 0, 0, 0, 0, 4,    size 4
+        //      110, 97, 109, 101,         "name"
+        //      18,                        string
+        //      0, 0, 0, 0, 0, 0, 0, 4,    size 4
+        //      106, 111, 104, 110,        "john"
+        //      18,                        string
+        //      0, 0, 0, 0, 0, 0, 0, 3,    size 3
+        //      97, 103, 101,              "age"
+        //      10,                        u32
+        //      0, 0, 0, 32,               32
+        //      28                         end of seq
+        //  ]
     }
 }
