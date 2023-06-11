@@ -5,6 +5,9 @@ use crate::Error;
 mod de;
 mod ser;
 
+#[cfg(feature = "alloc")]
+mod value;
+
 pub use de::{from_bytes, Deserializer};
 #[cfg(feature = "alloc")]
 pub use ser::to_bytes;
