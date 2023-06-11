@@ -30,12 +30,12 @@ There is one case where the format is different, some types are serialized by se
 the default behavior for serde is to create a string and feed that to the formatter, and then serialize the string.
 But for optimization and avoid allocation, we can feed the writer directly to the formatter, 
 but the formatter does'nt feed the writer with all the bytes in one go so the length of the string is unknown at the beggining of it's serialization.
-To avoid this problem we can use a solution like a null terminated string, but `NUL` is a valid UTF-8 char, so we can't just set the end byte with `0u8`, but `u8::MAX` is not valid UTF-8, so we can use that. 
-So we set the length to `u64::MAX`, and end sequence with `u8::MAX`.
+To avoid this problem we can use a solution like a null terminated string, but `NUL` is a valid UTF-8 char, so we can't just set the end byte with `0u8`, but `0xD800` is not valid UTF-8, so we can use that. 
+So we set the length to `u64::MAX`, and end sequence with `0xD800`.
 
 ```
-| length (u64::MAX) |  bytes (UTF-8)  | end byte (u8::MAX) |
-|      u8 * 8       |      u8 * ?     |         u8         |
+| length (u64::MAX) |  bytes (UTF-8)  |   end bytes (0xD800)  |
+|      u8 * 8       |      u8 * ?     |        u8 * 2         |
 ```
 
 Such fomat can't be implemented for regular sequences, as the types in the sequences produces any bytes, so there is no end marker that we can be sure it would be unique in the bytes produced.
@@ -95,6 +95,10 @@ If the option contain a value, the value is then serialized after it.
 
 For serializing Enums, a tag is first written down as a `u32`. Then the variant is serialized depending on its categorie (unit, newtype, tuple, struct).
 
+
+## Module any
+
+The module `serde_bin::any` implement a serializer/deserializer that include the data type in the binary, allowing the use of `serde::de::Deserializer::deserialize_any`. This can allow for example deserialization of untagged enums.
 
 ## Features
 - default: The `std` feature is enabled by default.
