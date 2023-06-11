@@ -198,11 +198,10 @@ mod tests {
         Struct { num: usize },
     }
 
-    // #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    // struct TestBorrow<'a, 'b> {
-    //     name: &'a str,
-    //     bytes: &'b [u8],
-    // }
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestBorrow<'a> {
+        name: &'a str,
+    }
 
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct FlattenTestInner {
@@ -504,20 +503,17 @@ mod tests {
         assert_eq!(value, res);
     }
 
-    // #[test]
-    // fn test_serialize_deserialize_borrowed() {
-    //     let value = TestBorrow {
-    //         name: "john",
-    //         bytes: b"doe",
-    //     };
+    #[test]
+    fn test_serialize_deserialize_borrowed() {
+        let value = TestBorrow { name: "john" };
 
-    //     let mut v: Vec<u8> = Vec::new();
-    //     ser::to_writer(&value, &mut v).unwrap();
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&value, &mut v).unwrap();
 
-    //     let res: TestBorrow = de::from_bytes(&v).unwrap();
+        let res: TestBorrow = de::from_bytes(&v).unwrap();
 
-    //     assert_eq!(value, res);
-    // }
+        assert_eq!(value, res);
+    }
 
     #[test]
     fn test_serialize_deserialize_flattened() {
