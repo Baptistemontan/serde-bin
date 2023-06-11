@@ -217,9 +217,12 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             Some(len) => {
                 let len: u64 = len as u64;
                 let written_bytes = self.write_tag_then(Tag::Seq, &len.to_be_bytes())?;
-                Ok(SeqSerializer::new_known(self, written_bytes))
+                Ok(SeqSerializer::new(self, written_bytes, true))
             }
-            None => SeqSerializer::new_unknown(self),
+            None => {
+                let written_bytes = self.write_tag(Tag::UnsizedSeq)?;
+                Ok(SeqSerializer::new(self, written_bytes, false))
+            }
         }
     }
 
@@ -239,7 +242,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, W::Error> {
         let len: u8 = len as u8;
         let wb = self.write_tag_then(Tag::Tuple, &len.to_be_bytes())?;
-        Ok(SeqSerializer::new_known(self, wb))
+        Ok(SeqSerializer::new(self, wb, true))
     }
 
     fn serialize_tuple_struct(
@@ -249,7 +252,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     ) -> Result<Self::SerializeTupleStruct, W::Error> {
         let len: u8 = len as u8;
         let wb = self.write_tag_then(Tag::TupleStruct, &len.to_be_bytes())?;
-        Ok(SeqSerializer::new_known(self, wb))
+        Ok(SeqSerializer::new(self, wb, true))
     }
 
     fn serialize_tuple_variant(
@@ -260,7 +263,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, W::Error> {
         let wb = self.write_tag_then(Tag::TupleVariant, &variant_index.to_be_bytes())?;
-        Ok(SeqSerializer::new_known(self, wb))
+        Ok(SeqSerializer::new(self, wb, true))
     }
 
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, W::Error> {
@@ -268,9 +271,12 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
             Some(len) => {
                 let len: u64 = len as u64;
                 let wb = self.write_tag_then(Tag::Map, &len.to_be_bytes())?;
-                Ok(SeqSerializer::new_known(self, wb))
+                Ok(SeqSerializer::new(self, wb, true))
             }
-            None => SeqSerializer::new_unknown(self),
+            None => {
+                let written_bytes = self.write_tag(Tag::UnsizedMap)?;
+                Ok(SeqSerializer::new(self, written_bytes, false))
+            }
         }
     }
 
@@ -281,7 +287,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     ) -> Result<Self::SerializeStruct, W::Error> {
         let len = len as u8;
         let wb = self.write_tag_then(Tag::Struct, &len.to_be_bytes())?;
-        Ok(SeqSerializer::new_known(self, wb))
+        Ok(SeqSerializer::new(self, wb, true))
     }
 
     fn serialize_struct_variant(
@@ -292,7 +298,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, W::Error> {
         let wb = self.write_tag_then(Tag::StructVariant, &variant_index.to_be_bytes())?;
-        Ok(SeqSerializer::new_known(self, wb))
+        Ok(SeqSerializer::new(self, wb, true))
     }
 
     fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, W::Error>
@@ -310,95 +316,19 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
     }
 }
 
-#[cfg(all(feature = "alloc", not(feature = "no-unsized-seq")))]
-pub enum SeqSerializer<'a, W> {
-    KnownSize {
-        serializer: &'a mut Serializer<W>,
-        written_bytes: usize,
-    },
-    UnknownSize {
-        serializer: &'a mut Serializer<W>,
-        count: u64,
-        bytes: Vec<u8>,
-    },
-}
-
-#[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
 pub struct SeqSerializer<'a, W> {
     serializer: &'a mut Serializer<W>,
     written_bytes: usize,
+    known_size: bool,
 }
 
-#[cfg(all(feature = "alloc", not(feature = "no-unsized-seq")))]
 impl<'a, W: Write> SeqSerializer<'a, W> {
-    pub fn new_known(serializer: &'a mut Serializer<W>, written_bytes: usize) -> Self {
-        Self::KnownSize {
-            serializer,
-            written_bytes,
-        }
-    }
-
-    pub fn new_unknown(serializer: &'a mut Serializer<W>) -> Result<Self, W::Error> {
-        Ok(Self::UnknownSize {
-            count: 0,
-            bytes: Vec::new(),
-            serializer,
-        })
-    }
-
-    pub fn ser_value<T: ?Sized>(&mut self, value: &T) -> Result<(), W::Error>
-    where
-        T: Serialize,
-    {
-        match self {
-            SeqSerializer::KnownSize {
-                serializer,
-                written_bytes,
-            } => {
-                *written_bytes += value.serialize(&mut **serializer)?;
-                Ok(())
-            }
-            SeqSerializer::UnknownSize { count, bytes, .. } => {
-                let mut serializer = Serializer { writer: bytes };
-                *count += 1;
-                value
-                    .serialize(&mut serializer)
-                    .map_err(Error::unwrap_writer_error)?;
-                Ok(())
-            }
-        }
-    }
-
-    pub fn finish(self) -> Result<usize, W::Error> {
-        match self {
-            SeqSerializer::KnownSize { written_bytes, .. } => Ok(written_bytes),
-            SeqSerializer::UnknownSize {
-                count,
-                bytes,
-                serializer,
-            } => {
-                let written_bytes = serializer.writer.write_bytes(&count.to_be_bytes())?;
-                serializer
-                    .writer
-                    .write_bytes(&bytes)
-                    .map(|wb| wb + written_bytes)
-                    .map_err(Error::WriterError)
-            }
-        }
-    }
-}
-
-#[cfg(any(not(feature = "alloc"), feature = "no-unsized-seq"))]
-impl<'a, W: Write> SeqSerializer<'a, W> {
-    pub fn new_known(serializer: &'a mut Serializer<W>, written_bytes: usize) -> Self {
+    pub fn new(serializer: &'a mut Serializer<W>, written_bytes: usize, known_size: bool) -> Self {
         Self {
             serializer,
             written_bytes,
+            known_size,
         }
-    }
-
-    pub fn new_unknown(_serializer: &'a mut Serializer<W>) -> Result<Self, W::Error> {
-        Err(Error::UnknownSeqLength)
     }
 
     pub fn ser_value<T: ?Sized>(&mut self, value: &T) -> Result<(), W::Error>
@@ -409,7 +339,10 @@ impl<'a, W: Write> SeqSerializer<'a, W> {
         Ok(())
     }
 
-    pub fn finish(self) -> Result<usize, W::Error> {
+    pub fn finish(mut self) -> Result<usize, W::Error> {
+        if !self.known_size {
+            self.written_bytes += self.serializer.write_tag(Tag::UnsizedSeqEnd)?;
+        }
         Ok(self.written_bytes)
     }
 }

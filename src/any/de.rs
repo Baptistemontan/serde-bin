@@ -193,15 +193,19 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 self.deserialize_enum("", &[], visitor)
             }
             Tag::NewTypeStruct => self.deserialize_newtype_struct("", visitor),
-            Tag::Seq => self.deserialize_seq(visitor),
+            Tag::Seq | Tag::UnsizedSeq => self.deserialize_seq(visitor),
             Tag::Tuple => self.parse_tuple(visitor),
             Tag::TupleStruct => self.parse_tuple_struct(visitor),
-            Tag::Map => self.deserialize_map(visitor),
+            Tag::Map | Tag::UnsizedMap => self.deserialize_map(visitor),
             Tag::Struct => self.parse_struct(visitor),
             #[cfg(not(no_integer128))]
             Tag::I128 => self.deserialize_i128(visitor),
             #[cfg(not(no_integer128))]
             Tag::U128 => self.deserialize_u128(visitor),
+            Tag::UnsizedSeqEnd => Err(Error::TagParsingError(TagParsingError::unexpected(
+                "Any tag other than end of sequence",
+                Tag::UnsizedSeqEnd,
+            ))),
         }
     }
 
@@ -325,8 +329,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Seq, self, "Sequence");
-        let seq_des = SeqDeserializer::new(self)?;
+        let seq_des = match_tag! {
+            self.pop_tag()?, "Sequence",
+            Tag::Seq => SeqDeserializer::new(self)?
+            Tag::UnsizedSeq => SeqDeserializer::new_unsized(self)
+        };
         visitor.visit_seq(seq_des)
     }
 
@@ -371,8 +378,11 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        check_tag!(Tag::Map, self, "Map");
-        let seq_des = SeqDeserializer::new(self)?;
+        let seq_des = match_tag! {
+            self.pop_tag()?, "Map",
+            Tag::Map => SeqDeserializer::new(self)?
+            Tag::UnsizedMap => SeqDeserializer::new_unsized(self)
+        };
         visitor.visit_map(seq_des)
     }
 
@@ -433,7 +443,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
 struct SeqDeserializer<'a, 'de: 'a> {
     de: &'a mut Deserializer<'de>,
-    remaining: usize,
+    remaining: Option<usize>,
 }
 
 impl<'a, 'de> SeqDeserializer<'a, 'de> {
@@ -443,7 +453,17 @@ impl<'a, 'de> SeqDeserializer<'a, 'de> {
     }
 
     fn new_with_len(de: &'a mut Deserializer<'de>, len: usize) -> Self {
-        Self { de, remaining: len }
+        Self {
+            de,
+            remaining: Some(len),
+        }
+    }
+
+    fn new_unsized(de: &'a mut Deserializer<'de>) -> Self {
+        Self {
+            de,
+            remaining: None,
+        }
     }
 }
 
@@ -454,17 +474,21 @@ impl<'de, 'a> SeqAccess<'de> for SeqDeserializer<'a, 'de> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        if self.remaining == 0 {
+        if let Some(remaining) = self.remaining.as_mut() {
+            if *remaining == 0 {
+                return Ok(None);
+            }
+            *remaining -= 1;
+        } else if let Tag::UnsizedSeqEnd = self.de.peek_tag()? {
+            self.de.pop_tag()?;
             return Ok(None);
         }
-
-        self.remaining -= 1;
 
         seed.deserialize(&mut *self.de).map(Some)
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+        self.remaining
     }
 }
 
@@ -475,13 +499,7 @@ impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
     where
         K: de::DeserializeSeed<'de>,
     {
-        if self.remaining == 0 {
-            return Ok(None);
-        }
-
-        self.remaining -= 1;
-
-        seed.deserialize(&mut *self.de).map(Some)
+        self.next_element_seed(seed)
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value>
@@ -492,7 +510,7 @@ impl<'de, 'a> MapAccess<'de> for SeqDeserializer<'a, 'de> {
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.remaining)
+        self.remaining
     }
 }
 
