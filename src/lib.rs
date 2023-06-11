@@ -1,3 +1,4 @@
+pub mod any;
 mod de;
 mod error;
 mod ser;
@@ -11,6 +12,8 @@ pub use ser::to_bytes;
 pub use ser::to_writer;
 pub use ser::{get_serialized_size, to_buff, Serializer};
 pub use write::{BuffWriter, EndOfBuff, Write};
+
+const UNSIZED_STRING_END_MARKER: [u8; 2] = [0xD8, 0x00];
 
 #[cfg(all(test, feature = "test-utils"))]
 mod tests {
@@ -30,6 +33,16 @@ mod tests {
         NewType(u8),
         Tuple(f32, String),
         Struct { a: f64, b: Vec<u16> },
+    }
+
+    #[test]
+    fn test_invalid_utf8_char() {
+        let [byte1, byte2] = UNSIZED_STRING_END_MARKER;
+        assert_eq!(
+            char::from_u32(u32::from_be_bytes([0, 0, byte1, byte2])),
+            None
+        );
+        assert!(core::str::from_utf8(&UNSIZED_STRING_END_MARKER).is_err());
     }
 
     #[test]
@@ -195,5 +208,53 @@ mod tests {
         let res: TestEnum = de::from_bytes(&v).unwrap();
 
         assert_eq!(value, res);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_char1() {
+        let c = 'Y';
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&c, &mut v).unwrap();
+
+        let res: char = de::from_bytes(&v).unwrap();
+
+        assert_eq!(c, res);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_char2() {
+        let c = 'î'; // 0xC3AE
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&c, &mut v).unwrap();
+
+        let res: char = de::from_bytes(&v).unwrap();
+
+        assert_eq!(c, res);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_char3() {
+        let c = 'ࠎ'; // 0xE0A08E
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&c, &mut v).unwrap();
+
+        let res: char = de::from_bytes(&v).unwrap();
+
+        assert_eq!(c, res);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_char4() {
+        let c = '𒀀'; // 0xF0928080
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&c, &mut v).unwrap();
+
+        let res: char = de::from_bytes(&v).unwrap();
+
+        assert_eq!(c, res);
     }
 }

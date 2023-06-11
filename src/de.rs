@@ -3,7 +3,10 @@ use serde::{
     serde_if_integer128, Deserialize,
 };
 
-use crate::error::{Error, NoWriterError, Result};
+use crate::{
+    error::{Error, NoWriterError, Result},
+    UNSIZED_STRING_END_MARKER,
+};
 
 pub struct Deserializer<'de> {
     input: &'de [u8],
@@ -54,9 +57,8 @@ impl<'de> Deserializer<'de> {
         let len = if len == u64::MAX {
             // unknown str length, "null" terminated
             self.input
-                .iter()
-                .copied()
-                .position(|byte| byte == u8::MAX)
+                .windows(UNSIZED_STRING_END_MARKER.len())
+                .position(|bytes| bytes == UNSIZED_STRING_END_MARKER)
                 .ok_or(Error::Eof)?
         } else {
             len.try_into().map_err(|_| Error::InvalidSize)?

@@ -5,6 +5,7 @@ use std::io;
 
 use crate::error::{Error, Result};
 use crate::write::{BuffWriter, DummyWriter, EndOfBuff, Write};
+use crate::UNSIZED_STRING_END_MARKER;
 use core::fmt;
 
 #[cfg(feature = "alloc")]
@@ -272,7 +273,7 @@ impl<'a, W: Write> ser::Serializer for &'a mut Serializer<W> {
         fmt::write(&mut collector, format_args!("{}", value))?;
         written_bytes += collector.written_bytes;
         // "null" terminated str
-        written_bytes += self.writer.write_byte(u8::MAX)?;
+        written_bytes += self.writer.write_bytes(&UNSIZED_STRING_END_MARKER)?;
         Ok(written_bytes)
     }
 }
