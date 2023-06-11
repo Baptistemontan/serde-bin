@@ -97,7 +97,7 @@ pub struct EndOfBuff;
 impl WriterError for EndOfBuff {}
 
 impl Display for EndOfBuff {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("Reached end of buffer before end of serialization.")
     }
 }

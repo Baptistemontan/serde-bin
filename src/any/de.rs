@@ -567,7 +567,7 @@ struct FieldDeserializer(u64);
 
 macro_rules! impl_unimplemented {
     ($($fn_name:ident),*) => {
-        $(fn $fn_name<V>(self, _visitor: V) -> std::result::Result<V::Value, Self::Error>
+        $(fn $fn_name<V>(self, _visitor: V) -> Result<V::Value>
         where
             V: Visitor<'de>,
         {
@@ -579,7 +579,7 @@ macro_rules! impl_unimplemented {
 impl<'de> de::Deserializer<'de> for FieldDeserializer {
     type Error = Error;
 
-    fn deserialize_any<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -608,40 +608,28 @@ impl<'de> de::Deserializer<'de> for FieldDeserializer {
         deserialize_map
     }
 
-    fn deserialize_u64<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         visitor.visit_u64(self.0)
     }
 
-    fn deserialize_unit_struct<V>(
-        self,
-        _name: &'static str,
-        _visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_unit_struct<V>(self, _name: &'static str, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         unimplemented!()
     }
 
-    fn deserialize_newtype_struct<V>(
-        self,
-        _name: &'static str,
-        _visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_newtype_struct<V>(self, _name: &'static str, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         unimplemented!()
     }
 
-    fn deserialize_tuple<V>(
-        self,
-        _len: usize,
-        _visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -653,7 +641,7 @@ impl<'de> de::Deserializer<'de> for FieldDeserializer {
         _name: &'static str,
         _len: usize,
         _visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    ) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -665,7 +653,7 @@ impl<'de> de::Deserializer<'de> for FieldDeserializer {
         _name: &'static str,
         _fields: &'static [&'static str],
         _visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    ) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
@@ -677,21 +665,21 @@ impl<'de> de::Deserializer<'de> for FieldDeserializer {
         _name: &'static str,
         _variants: &'static [&'static str],
         _visitor: V,
-    ) -> std::result::Result<V::Value, Self::Error>
+    ) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         unimplemented!()
     }
 
-    fn deserialize_identifier<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
         self.deserialize_any(visitor)
     }
 
-    fn deserialize_ignored_any<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
