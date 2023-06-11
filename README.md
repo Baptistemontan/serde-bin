@@ -98,7 +98,7 @@ For serializing Enums, a tag is first written down as a `u32`. Then the variant 
 
 ## Module any
 
-The module `serde_bin::any` implement a serializer/deserializer that include the data type in the binary, allowing the use of `serde::de::Deserializer::deserialize_any`. This can allow for example deserialization of untagged enums.
+The module `serde_bin::any` implement a serializer/deserializer that include the data type in the binary, allowing the use of `serde::de::Deserializer::deserialize_any` and can serialize/deserialize sequences and maps with unknown size without the need of the `alloc` or `std` feature. This can for example allow the deserialization of untagged enums.
 
 ## Features
 - default: The `std` feature is enabled by default.
