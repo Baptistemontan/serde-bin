@@ -280,7 +280,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         check_tag!(Tag::ByteArray, self.pop_tag()?, "ByteArray");
         let len = self.pop_usize()?;
         let bytes = self.pop_slice(len)?;
-        visitor.visit_bytes(bytes)
+        visitor.visit_borrowed_bytes(bytes)
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value>
