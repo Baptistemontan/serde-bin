@@ -191,32 +191,6 @@ mod tests {
         Struct { a: f64, b: Vec<u16> },
     }
 
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    #[serde(untagged)]
-    enum UntaggedEnum {
-        NewType(String),
-        Struct { num: usize },
-    }
-
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    struct TestBorrow<'a> {
-        name: &'a str,
-    }
-
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    struct FlattenTestInner {
-        name: String,
-        age: u32,
-    }
-
-    #[derive(Debug, Serialize, Deserialize, PartialEq)]
-    struct FlattenTest {
-        a: char,
-        b: String,
-        #[serde(flatten)]
-        c: FlattenTestInner,
-    }
-
     #[test]
     fn test_serialize_struct() {
         const N: usize = 56;
@@ -479,6 +453,13 @@ mod tests {
         assert_eq!(c, res);
     }
 
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[serde(untagged)]
+    enum UntaggedEnum {
+        NewType(String),
+        Struct { num: usize },
+    }
+
     #[test]
     fn test_serialize_deserialize_untagged_enum_variant1() {
         let value = UntaggedEnum::NewType("t".into());
@@ -503,9 +484,28 @@ mod tests {
         assert_eq!(value, res);
     }
 
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestBorrow<'a, 'b> {
+        name: &'a str,
+        #[serde(serialize_with = "serialize_as_bytes")]
+        bytes: &'b [u8],
+    }
+
+    // default behavior of the auto derive for serialize is to serialize the byte slice as a sequence
+    // so this external function is needed to serialize it as bytes
+    fn serialize_as_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_bytes(bytes)
+    }
+
     #[test]
     fn test_serialize_deserialize_borrowed() {
-        let value = TestBorrow { name: "john" };
+        let value = TestBorrow {
+            name: "john",
+            bytes: b"doe",
+        };
 
         let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&value, &mut v).unwrap();
@@ -513,6 +513,20 @@ mod tests {
         let res: TestBorrow = de::from_bytes(&v).unwrap();
 
         assert_eq!(value, res);
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct FlattenTestInner {
+        name: String,
+        age: u32,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct FlattenTest {
+        a: char,
+        b: String,
+        #[serde(flatten)]
+        c: FlattenTestInner,
     }
 
     #[test]
@@ -559,5 +573,28 @@ mod tests {
         //      0, 0, 0, 32,               32
         //      28                         end of seq
         //  ]
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct SkippedFieldTest {
+        #[serde(skip)]
+        name: String,
+        age: u32,
+    }
+
+    #[test]
+    fn test_serialize_deserialize_skipped() {
+        let value = SkippedFieldTest {
+            name: "john".into(),
+            age: 42,
+        };
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&value, &mut v).unwrap();
+
+        let res: SkippedFieldTest = de::from_bytes(&v).unwrap();
+
+        assert_eq!(value.age, res.age);
+        assert_eq!(res.name, String::default())
     }
 }
