@@ -1,5 +1,5 @@
 use serde::{
-    de::{self, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor},
+    de::{self, EnumAccess, IntoDeserializer, MapAccess, SeqAccess, VariantAccess, Visitor},
     serde_if_integer128, Deserialize,
 };
 
@@ -590,130 +590,6 @@ impl<'a, 'de> StructDeserializer<'a, 'de> {
     }
 }
 
-struct FieldDeserializer(u64);
-
-macro_rules! impl_unimplemented {
-    ($($fn_name:ident),*) => {
-        $(fn $fn_name<V>(self, _visitor: V) -> Result<V::Value>
-        where
-            V: Visitor<'de>,
-        {
-            unimplemented!()
-        })*
-    };
-}
-
-impl<'de> de::Deserializer<'de> for FieldDeserializer {
-    type Error = Error;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_u64(visitor)
-    }
-
-    impl_unimplemented! {
-        deserialize_bool,
-        deserialize_i8,
-        deserialize_i16,
-        deserialize_i32,
-        deserialize_i64,
-        deserialize_u8,
-        deserialize_u16,
-        deserialize_u32,
-        deserialize_f32,
-        deserialize_f64,
-        deserialize_char,
-        deserialize_str,
-        deserialize_string,
-        deserialize_bytes,
-        deserialize_byte_buf,
-        deserialize_option,
-        deserialize_unit,
-        deserialize_seq,
-        deserialize_map
-    }
-
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        visitor.visit_u64(self.0)
-    }
-
-    fn deserialize_unit_struct<V>(self, _name: &'static str, _visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        unimplemented!()
-    }
-
-    fn deserialize_newtype_struct<V>(self, _name: &'static str, _visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        unimplemented!()
-    }
-
-    fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        unimplemented!()
-    }
-
-    fn deserialize_tuple_struct<V>(
-        self,
-        _name: &'static str,
-        _len: usize,
-        _visitor: V,
-    ) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        unimplemented!()
-    }
-
-    fn deserialize_struct<V>(
-        self,
-        _name: &'static str,
-        _fields: &'static [&'static str],
-        _visitor: V,
-    ) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        unimplemented!()
-    }
-
-    fn deserialize_enum<V>(
-        self,
-        _name: &'static str,
-        _variants: &'static [&'static str],
-        _visitor: V,
-    ) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        unimplemented!()
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_any(visitor)
-    }
-
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_any(visitor)
-    }
-}
-
 impl<'de, 'a> MapAccess<'de> for StructDeserializer<'a, 'de> {
     type Error = Error;
 
@@ -725,7 +601,7 @@ impl<'de, 'a> MapAccess<'de> for StructDeserializer<'a, 'de> {
             return Ok(None);
         }
 
-        let de = FieldDeserializer(self.current_index);
+        let de = self.current_index.into_deserializer();
         self.remaining -= 1;
         self.current_index += 1;
 
