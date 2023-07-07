@@ -174,6 +174,8 @@ impl<We> From<TagParsingError> for Error<We> {
 #[cfg(all(test, feature = "test-utils"))]
 mod tests {
 
+    use crate::any::value::Value;
+
     use super::*;
     use serde::{Deserialize, Serialize};
 
@@ -412,6 +414,8 @@ mod tests {
         let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&c, &mut v).unwrap();
 
+        assert_eq!(v.len(), 2);
+
         let res: char = de::from_bytes(&v).unwrap();
 
         assert_eq!(c, res);
@@ -423,6 +427,8 @@ mod tests {
 
         let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&c, &mut v).unwrap();
+
+        assert_eq!(v.len(), 3);
 
         let res: char = de::from_bytes(&v).unwrap();
 
@@ -436,6 +442,8 @@ mod tests {
         let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&c, &mut v).unwrap();
 
+        assert_eq!(v.len(), 4);
+
         let res: char = de::from_bytes(&v).unwrap();
 
         assert_eq!(c, res);
@@ -447,6 +455,8 @@ mod tests {
 
         let mut v: Vec<u8> = Vec::new();
         ser::to_writer(&c, &mut v).unwrap();
+
+        assert_eq!(v.len(), 5);
 
         let res: char = de::from_bytes(&v).unwrap();
 
@@ -596,5 +606,78 @@ mod tests {
 
         assert_eq!(value.age, res.age);
         assert_eq!(res.name, String::default())
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct TestDisplay<'a> {
+        #[serde(serialize_with = "serialize_as_display")]
+        name: &'a str,
+        age: u32,
+    }
+
+    // default behavior of the auto derive for serialize is to serialize the byte slice as a sequence
+    // so this external function is needed to serialize it as bytes
+    fn serialize_as_display<T: Display, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.collect_str(value)
+    }
+
+    #[test]
+    fn test_serialize_deserialize_collect_str() {
+        let value = TestDisplay {
+            name: "john",
+            age: 42,
+        };
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&value, &mut v).unwrap();
+
+        let res: TestDisplay = de::from_bytes(&v).unwrap();
+
+        assert_eq!(value, res);
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    #[serde(tag = "t", content = "c")]
+    enum AdjTaggedEnum {
+        NewType(String),
+        Struct { num: usize },
+    }
+
+    #[test]
+    #[should_panic]
+    // should panic because adjacently tagged enums don't support u64 identifier like other struct-like types.
+    fn test_serialize_deserialize_adj_tagged_enum_variant1() {
+        let value = AdjTaggedEnum::NewType("john".into());
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&value, &mut v).unwrap();
+
+        let repr: Value = de::from_bytes(&v).unwrap();
+        println!("{:?}", v);
+        println!("{:?}", repr);
+
+        let res: AdjTaggedEnum = de::from_bytes(&v).unwrap();
+
+        assert_eq!(value, res);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_serialize_deserialize_adj_tagged_enum_variant2() {
+        let value = AdjTaggedEnum::Struct { num: 12 };
+
+        let mut v: Vec<u8> = Vec::new();
+        ser::to_writer(&value, &mut v).unwrap();
+
+        let repr: Value = de::from_bytes(&v).unwrap();
+        println!("{:?}", v);
+        println!("{:?}", repr);
+
+        let res: AdjTaggedEnum = de::from_bytes(&v).unwrap();
+
+        assert_eq!(value, res);
     }
 }
